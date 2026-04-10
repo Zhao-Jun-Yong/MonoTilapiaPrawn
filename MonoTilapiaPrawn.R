@@ -375,35 +375,6 @@ ggplot(data = taiwan_map_sf) +
         panel.background = element_rect(fill = "white"))
 dev.off()
 
-tiff("site_forppt.png", units="in", width = 5, height = 7, res=300)
-ggplot(data = taiwan_map_sf) + 
-  geom_sf(fill= "lightgray") +
-  xlab(expression(bold(paste("Longitude")))) +
-  ylab(expression(bold(paste("Latitude")))) +
-  coord_sf(xlim = c(119, 123), ylim = c(21.50, 25.50), expand = FALSE) +
-  annotation_scale(location = "bl", width_hint = 0.5) +
-  annotation_north_arrow(location = "bl", which_north = "true", 
-                         pad_x = unit(0.75, "in"), pad_y = unit(0.5, "in"),
-                         style = north_arrow_fancy_orienteering) +
-  annotate(geom = "text", x = c(121.42, 120.97, 120.31, 120.11, 119.80, 120.30, 120.45), 
-           y = c(25.37, 25.11, 24.13, 23.10, 23.49, 23.70, 23.35),
-           label = c("K-WZW", "K-XF", "A-FY", "A-BM", "L-AGL", "L-AGH", "R-HML"), 
-           fontface = "bold",  size = 4) +
-  annotate(geom = "text", x = 121, y = 24, label = "Taiwan", 
-           fontface = "italic",  size = 4) +
-  geom_point(data = site, aes(x=long, y=lat, fill = species, shape = species), size = 3, 
-             stroke = 1) +
-  scale_shape_manual(values = c(21, 22, 23, 24)) +
-  see::scale_fill_okabeito(order = c(3, 6, 1, 2)) +
-  theme_bw(base_size=12) +
-  theme(legend.position = "none",
-        panel.grid.major = element_blank(),
-        text = element_text(family = "Century Gothic", color = "black"),
-        axis.text.x = element_text(face = "bold"),  
-        axis.text.y = element_text(face = "bold"), 
-        panel.background = element_rect(fill = "white"))
-dev.off()
-
 # envr --------------------------------------------------------------------
 
 tab_envr <- descriptive_statistic(filter(df_envr, period == 'CP'),
@@ -1124,7 +1095,7 @@ ghg_diurnal_fig_f <-
            size = 6) +
   theme(axis.text.x = element_text(face = "bold.italic")) 
 
-png(filename = "~/Desktop/Workspace/100 Area/110 Academic/112 Article/MonoTilapiaPrawn/monotilapiaprawn_ghg_diurnal.png", 
+png("output/ghg_diurnal.png", 
     width = 22, height = 12, units = "in", res = 300)
 ggarrange(ghg_diurnal_fig_a, ghg_diurnal_fig_b, ghg_diurnal_fig_c,
           ghg_diurnal_fig_d, ghg_diurnal_fig_e, ghg_diurnal_fig_f,
@@ -1571,8 +1542,6 @@ info %>%
 
 
 # cor ---------------------------------------------------------------------
-
-source("R/utils/modified_corrplot.R")
 
 df_cor <- raw_budget %>%
   filter(water == 'fw', type == 'mono', name != 'prawn T1')

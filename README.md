@@ -4,9 +4,8 @@
 
 Data and R scripts supporting the manuscript:
 
-> **Species-specific greenhouse gas emissions and carbon budgets in freshwater monoculture ponds**  
-> Zhao-Jun Yong, Wei‐Jen Lin, Yao-Chen Lee, Yan-Cheng Liang, Shuenn-Der Yang, Hsing-Juh Lin  
-> *[Journal]*. DOI: [to be added after publication]
+> Title: **Species-specific greenhouse gas emissions and carbon budgets in freshwater monoculture ponds**  
+> Authors: Zhao-Jun Yong, Wei‐Jen Lin, Yao-Chen Lee, Yan-Cheng Liang, Shuenn-Der Yang, Hsing-Juh Lin  
 
 ---
 
@@ -15,11 +14,9 @@ Data and R scripts supporting the manuscript:
 | Path | Description |
 |------|-------------|
 | `R/00_R_preparation.R` | Package loading, custom functions, and constants |
-| `R/utils/modified_corrplot.R` | Custom corrplot helper function |
 | `MonoTilapiaPrawn.R` | Main analysis script (environmental factors, GHG, DO metabolism, carbon budget, PLS-SEM) |
-| `R/PrawnCarbonBudget.R` | Per-period carbon budget calculations for prawn tanks |
-| `data/*.rds` | Pre-processed datasets (freshwater monoculture: tilapia and prawn) |
-| `data/weather/weather_MonoTilapiaPrawn/` | Raw HOBO data-logger CSV files |
+| `R/PrawnCarbonBudget.R` | Per-period carbon budget calculations for prawn ponds |
+| `data/*.rds` | Pre-processed datasets |
 | `data/PT_info.xlsx` | Culture period definitions for prawn tanks |
 | `data/20260219_tab_ghg_studies.xlsx` | Literature GHG values used for comparison |
 | `output/` | Generated figures and tables (not tracked in git; reproduced by running the script) |
@@ -58,21 +55,19 @@ All `data/*.rds` files contain data filtered to freshwater monoculture systems (
 | `doc.rds` | Dissolved organic carbon |
 | `poc.rds` | Particulate organic carbon |
 | `soc.rds` | Soil organic carbon |
-| `sa.rds` | Sediment carbon accumulation |
+| `sa.rds` | Sediment accumulation |
 | `envr.rds` | Environmental parameters (temperature, DO, pH, EC, turbidity, etc.) |
-| `budget.rds` | Aggregated carbon budget by culture period |
-| `raw_budget.rds` | Carbon budget components at measurement scale |
-| `feed.rds` | Feed input records |
+| `budget.rds` | Carbon budget (each pond) |
+| `raw_budget.rds` | Carbon budget (each sampling campaign) |
+| `feed.rds` | Feed input |
 | `info.rds` | Pond information (area, depth, stocking density, etc.) |
 | `nutrient.rds` | Nutrient concentrations (NH₄⁺, NO₂⁻, NO₃⁻, PO₄³⁻) |
 | `animals.rds` | Cultured animal biomass and harvest records |
-| `weather_year.rds` | Annual weather summary |
+| `weather_year.rds` | Annual weather summary at sampling site |
 
 
 ---
 
 ## Citation
 
-If you use this repository, please cite the associated manuscript (DOI above) and this dataset:
-
-> Yong, Z.-J., Lin, W.-J., Lee, Y.-C., Liang, Y.-C., Yang, S.-D., & Lin, H.-J. *MonoTilapiaPrawn: Data and analysis repository* [Data set]. Zenodo. https://doi.org/10.5281/zenodo.19467725
+If you use this repository, please cite the associated manuscript (not yet published) and this dataset.
