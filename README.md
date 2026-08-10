@@ -16,6 +16,7 @@ Data and R scripts supporting the manuscript:
 | `R/00_R_preparation.R` | Package loading, custom functions, and constants |
 | `MonoTilapiaPrawn.R` | Main analysis script (environmental factors, GHG, DO metabolism, carbon budget, PLS-SEM) |
 | `R/PrawnCarbonBudget.R` | Per-period carbon budget calculations for prawn ponds |
+| `R/TilapiaCarbonBudget.R` | Per-period carbon budget calculations for tilapia ponds |
 | `data/*.rds` | Pre-processed datasets |
 | `data/PT_info.xlsx` | Culture period definitions for prawn tanks |
 | `data/20260219_tab_ghg_studies.xlsx` | Literature GHG values used for comparison |
@@ -30,7 +31,7 @@ Data and R scripts supporting the manuscript:
 R (≥ 4.2) with the following packages:
 
 - `aelab` (install from GitHub: `remotes::install_github("yangshaojun/aelab")`)
-- CRAN packages: `readxl`, `openxlsx`, `tidyverse`, `ggplot2`, `pastecs`, `ggbreak`, `ggpubr`, `car`, `FSA`, `purrr`, `multcompView`, `rcompanion`, `Hmisc`, `corrplot`, `png`, `ghibli`, `ggthemr`, `ggsignif`, `see`, `extrafont`, `Rcpp`, `rnaturalearth`, `rnaturalearthdata`, `sf`, `ggspatial`, `G2Sd`, `circlize`, `recolorize`, `dichromat`, `rgdal`, `seminr`
+- CRAN packages: `openxlsx`, `tidyverse`, `ggplot2`, `ggpubr`, `purrr`, `Hmisc`, `corrplot`, `see`, `extrafont`, `rnaturalearth`, `sf`, `ggspatial`, `seminr`
 
 ### Steps
 
@@ -54,10 +55,8 @@ All `data/*.rds` files contain data filtered to freshwater monoculture systems (
 | `ghg_co2e.rds` | GHG fluxes converted to CO₂-equivalents |
 | `doc.rds` | Dissolved organic carbon |
 | `poc.rds` | Particulate organic carbon |
-| `soc.rds` | Soil organic carbon |
 | `sa.rds` | Sediment accumulation |
 | `envr.rds` | Environmental parameters (temperature, DO, pH, EC, turbidity, etc.) |
-| `budget.rds` | Carbon budget (each pond) |
 | `raw_budget.rds` | Carbon budget (each sampling campaign) |
 | `feed.rds` | Feed input |
 | `info.rds` | Pond information (area, depth, stocking density, etc.) |

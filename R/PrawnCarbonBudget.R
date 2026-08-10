@@ -1,17 +1,8 @@
 # PrawnCarbonBudget.R (REVISED VERSION)
 # ====================
 # Calculate carbon budgets for freshwater prawn monoculture by culture period
-#
-# Purpose: Properly recalculate carbon budget components for each culture period
-#          accounting for:
-#          - Different culture_day for each period
-#          - Varying feed input rates
-#          - Culture-period-specific stock/harvest biomass
-#          - First/last sampling for water carbon
-#
 # Output: One row per pond per culture period with properly calculated cb_ values
 #
-# Author: Revised 2025-12-22
 # ============================================================================
 
 # Section 1: Load Base Data ==================================================
@@ -144,7 +135,7 @@ ghg_cp <- ghg_co2e %>%
   mutate(
     # Recalculate cb_ghg from CH4 flux
     yr_culture = culture_day * day_to_yr,
-    cb_ghg = ghg_ch4_avg * µg_to_g * gm2d_to_Mghayr * yr_culture * (c_mass / ch4_mass),
+    cb_ghg = ghg_ch4_avg * µg_to_g * gm2hr_to_Mghayr * yr_culture * (c_mass / ch4_mass),
     cb_ghg_in = ifelse(cb_ghg < 0, abs(cb_ghg), 0),
     cb_ghg_out = ifelse(cb_ghg > 0, cb_ghg, 0)
   ) %>%
@@ -214,8 +205,6 @@ cat("✓ Feed carbon calculated for", nrow(feed_cp), "culture periods\n")
 ## 3.5 Stock/Harvest Biomass - From pt_info ==================================
 
 cat("Calculating stock/harvest biomass carbon...\n")
-
-# Get prawn C content from nutrient dataframe or use default
 
 prawn_stock_c_percent <- animals %>%
   filter(water == "fw", type == "mono", species == "prawn", status == "stocked") %>%

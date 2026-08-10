@@ -2,16 +2,15 @@
 
 source('R/00_R_preparation.R')
 source("R/PrawnCarbonBudget.R")
+source("R/TilapiaCarbonBudget.R")
 
 do         <- readRDS("data/do.rds")
 ghg        <- readRDS("data/ghg.rds")
 ghg_co2e   <- readRDS("data/ghg_co2e.rds")
 doc        <- readRDS("data/doc.rds")
 poc        <- readRDS("data/poc.rds")
-soc        <- readRDS("data/soc.rds")
 sa         <- readRDS("data/sa.rds")
 envr       <- readRDS("data/envr.rds")
-budget     <- readRDS("data/budget.rds")
 raw_budget <- readRDS("data/raw_budget.rds")
 feed       <- readRDS("data/feed.rds")
 info       <- readRDS("data/info.rds")
@@ -90,6 +89,34 @@ df_nutrient <- nutrient |>
          month = format(sampling_date, '%b'),
          month = factor(month, levels = month.abb))
 df_nutrient <- separate_culture_period(df_nutrient)
+
+df_doc <- doc |>
+  filter(water == 'fw', type == 'mono', name != 'prawn T1') %>%
+  mutate(name = dplyr::recode(name,
+                              'prawn T2' = 'PT1',
+                              'prawn T3' = 'PT2',
+                              'prawn T4' = 'PT3',
+                              'tilapia T1' = 'TT1',
+                              'tilapia T2' = 'TT2',
+                              'tilapia T3' = 'TT3'),
+         year_month = format(sampling_date, '%Y-%m'),
+         month = format(sampling_date, '%b'),
+         month = factor(month, levels = month.abb))
+df_doc <- separate_culture_period(df_doc)
+
+df_poc <- poc |>
+  filter(water == 'fw', type == 'mono', name != 'prawn T1') %>%
+  mutate(name = dplyr::recode(name,
+                              'prawn T2' = 'PT1',
+                              'prawn T3' = 'PT2',
+                              'prawn T4' = 'PT3',
+                              'tilapia T1' = 'TT1',
+                              'tilapia T2' = 'TT2',
+                              'tilapia T3' = 'TT3'),
+         year_month = format(sampling_date, '%Y-%m'),
+         month = format(sampling_date, '%b'),
+         month = factor(month, levels = month.abb))
+df_poc <- separate_culture_period(df_poc)
 
 plot_ghg_all <- function(df, y, ysd = NULL, plot){
 
@@ -183,8 +210,6 @@ create_cor_matrix <- function(df) {
 }
 
 library("seminr")
-#library("MASS")
-#library("rsvg")
 theme_sem <- seminr_theme_create(
   plot.fontname = "Century Gothic",
   plot.splines = T,
@@ -377,11 +402,18 @@ dev.off()
 
 # envr --------------------------------------------------------------------
 
-tab_envr <- descriptive_statistic(filter(df_envr, period == 'CP'),
-                                  vars = c(envr_temp, envr_ec, envr_do_pc, envr_do_w, 
-                                           envr_ph, envr_ntu, envr_sal, 
+df_envr_cp_avg <- df_envr %>%
+  filter(period == 'CP') %>%
+  summarise(across(c(envr_temp, envr_ec, envr_do_pc, envr_do_w,
+                      envr_ph, envr_ntu, envr_sal, envr_ss, envr_chla),
+                    ~ mean(.x, na.rm = TRUE)),
+            .by = c(species, name, sampling_date))
+
+tab_envr <- descriptive_statistic(df_envr_cp_avg,
+                                  vars = c(envr_temp, envr_ec, envr_do_pc, envr_do_w,
+                                           envr_ph, envr_ntu, envr_sal,
                                            envr_ss, envr_chla),
-                                  groups = c(name)) %>% 
+                                  groups = c(name)) %>%
   select(-contains('min'))
 colnames(tab_envr) <- gsub('_mean_sd', '', colnames(tab_envr))
 write.xlsx(tab_envr, file = 'output/envr.xlsx')
@@ -400,10 +432,10 @@ descriptive_statistic(df_envr,
 
 # for prawn
 
-df <- df_envr %>% 
-  filter(species == 'prawn', period == 'CP')
+df <- df_envr_cp_avg %>%
+  filter(species == 'prawn')
 
-variables <- c('envr_temp', 'envr_ec', 'envr_do_pc','envr_do_w', 
+variables <- c('envr_temp', 'envr_ec', 'envr_do_pc','envr_do_w',
                'envr_ph', 'envr_ntu', 'envr_sal', 'envr_ss', 'envr_chla')
 map(variables, ~ {
   normality_test_aov(df, .x, 'name') %>%
@@ -422,8 +454,8 @@ ks_test(df, 'envr_chla', 'name')#>0.05
 
 # for tilapia
 
-df <- df_envr %>% 
-  filter(species == 'tilapia', period == 'CP')
+df <- df_envr_cp_avg %>%
+  filter(species == 'tilapia')
 
 variables <- c('envr_temp', 'envr_ec', 'envr_do_pc','envr_do_w', 
                'envr_ph', 'envr_ntu', 'envr_sal', 'envr_ss', 'envr_chla')
@@ -445,10 +477,9 @@ ks_test(df, 'envr_chla', 'name')
 # between species
 
 
-df <- df_envr %>% 
-  filter(period == 'CP')
+df <- df_envr_cp_avg
 
-variables <- c('envr_temp', 'envr_ec', 'envr_do_pc','envr_do_w', 
+variables <- c('envr_temp', 'envr_ec', 'envr_do_pc','envr_do_w',
                'envr_ph', 'envr_ntu', 'envr_sal', 'envr_ss', 'envr_chla')
 map(variables, ~ {
   normality_test_t(df, .x, species, 'prawn', 'tilapia') %>%
@@ -466,44 +497,217 @@ wilcox.test(envr_ss ~ species, df)
 wilcox.test(envr_chla ~ species, df)
 aggregate(envr_chla ~ species, df, mean)
 
+## water C/N concentration -----
+
+### pond water
+
+df_water_doc <- df_doc %>%
+  filter(source == 'water', period == 'CP') %>%
+  group_by(species, name, sampling_date) %>%
+  summarise(dic = mean(dic, na.rm = TRUE),
+            doc = mean(doc, na.rm = TRUE),
+            dtn = mean(tn, na.rm = TRUE), .groups = 'drop')
+
+df_water_poc <- df_poc %>%
+  filter(source == 'water', period == 'CP') %>%
+  group_by(species, name, sampling_date) %>%
+  summarise(poc = mean(poc, na.rm = TRUE),
+            pon = mean(pon, na.rm = TRUE), .groups = 'drop')
+
+df_water <- inner_join(df_water_doc, df_water_poc, by = c('species', 'name', 'sampling_date')) %>%
+  mutate(toc = doc + poc, tn = dtn + pon)
+
+tab_water <- descriptive_statistic(df_water, vars = c(dic, toc, tn), groups = name) %>%
+  select(-contains('min')) %>%
+  as.data.frame()
+tab_water
+
+# for prawn
+df <- df_water %>%
+  filter(species == 'prawn')
+
+variables <- c('dic', 'toc', 'tn')
+map(variables, ~ {
+  normality_test_aov(df, .x, 'name') %>%
+    filter(p_value > 0.05)
+})
+
+ks_test(df, 'dic', 'name')
+ks_test(df, 'toc', 'name')
+ks_test(df, 'tn', 'name')
+
+# for tilapia
+df <- df_water %>%
+  filter(species == 'tilapia')
+
+variables <- c('dic', 'toc', 'tn')
+map(variables, ~ {
+  normality_test_aov(df, .x, 'name') %>%
+    filter(p_value > 0.05)
+})
+
+ks_test(df, 'dic', 'name')
+ks_test(df, 'toc', 'name')
+ks_test(df, 'tn', 'name')
+
+
+### inflow water
+
+df_inflow_doc <- doc %>%
+  filter(water == 'fw', type == 'mono', name != 'prawn T1',
+         source == 'in') %>%
+  mutate(name = dplyr::recode(name,
+                              'prawn T2' = 'PT1',
+                              'prawn T3' = 'PT2',
+                              'prawn T4' = 'PT3',
+                              'tilapia T1' = 'TT1',
+                              'tilapia T2' = 'TT2',
+                              'tilapia T3' = 'TT3')) %>%
+  group_by(name, sampling_date) %>%
+  summarise(dic = mean(dic, na.rm = TRUE),
+            doc = mean(doc, na.rm = TRUE),
+            dtn = mean(tn, na.rm = TRUE), .groups = 'drop')
+
+df_inflow_poc <- poc %>%
+  filter(water == 'fw', type == 'mono', name != 'prawn T1',
+         source == 'in') %>%
+  mutate(name = dplyr::recode(name,
+                              'prawn T2' = 'PT1',
+                              'prawn T3' = 'PT2',
+                              'prawn T4' = 'PT3',
+                              'tilapia T1' = 'TT1',
+                              'tilapia T2' = 'TT2',
+                              'tilapia T3' = 'TT3')) %>%
+  group_by(name, sampling_date) %>%
+  summarise(poc = mean(poc, na.rm = TRUE),
+            pon = mean(pon, na.rm = TRUE), .groups = 'drop')
+
+# DIC kept separate (inorganic pool); TOC/TN combine dissolved + particulate
+# fractions per sampling event before averaging
+df_inflow <- inner_join(df_inflow_doc, df_inflow_poc, by = c('name', 'sampling_date')) %>%
+  mutate(toc = doc + poc, tn = dtn + pon,
+         site_group = case_when(
+           name %in% c('PT1', 'PT2', 'PT3') ~ 'PT1-3',
+           name == 'TT1' ~ 'TT1',
+           name %in% c('TT2', 'TT3') ~ 'TT2-3'))
+
+tab_inflow <- descriptive_statistic(df_inflow, vars = c(dic, toc, tn), groups = name) %>%
+  select(-contains('min')) %>%
+  as.data.frame()
+tab_inflow
+
+# PT1-3 share one groundwater source and are sampled on the same monthly
+# campaign dates, so a same-date pond reading is a spatial replicate of one
+# source draw, not an independent temporal sample (pseudoreplication,
+# Hurlbert 1984) -- average across ponds within date first, then treat date
+# as the independent unit for mean +/- SD.
+df_inflow_site_date <- df_inflow %>%
+  group_by(site_group, sampling_date) %>%
+  summarise(dic = mean(dic, na.rm = TRUE),
+            toc = mean(toc, na.rm = TRUE),
+            tn = mean(tn, na.rm = TRUE), .groups = 'drop')
+
+tab_inflow_site <- descriptive_statistic(df_inflow_site_date, vars = c(dic, toc, tn), groups = site_group) %>%
+  select(-contains('min')) %>%
+  as.data.frame()
+tab_inflow_site
+
+
 ## nutrient-----
 
-tab_nutrient <- descriptive_statistic(df_nutrient,
-                      vars = c(conc_µM), 
-                      groups = c(name, nutrient)) |> 
-  select(-contains("min")) |> 
+tab_nutrient <- df_nutrient %>%
+  filter(period == 'CP') %>%
+  summarise(conc_µM = mean(conc_µM, na.rm = T),
+  .by = c(nutrient, species, name, sampling_date, rep)) %>%
+  pivot_wider(names_from = nutrient, values_from = conc_µM) %>%
+  summarise(NH4 = mean(NH4),
+            NO2 = mean(NO2),
+            NO3 = mean(NO3),
+            PO4 = mean(PO4),
+            .by = c(species, name, sampling_date))
+
+tab_nutrient_output <- descriptive_statistic(tab_nutrient,
+                      vars = c(NH4, NO2, NO3, PO4),
+                      groups = c(name)) |>
+  select(-contains("min")) |>
   as.data.frame()
-tab_nutrient <- tab_nutrient %>%
-  pivot_wider(names_from = nutrient, values_from = conc_µM_mean_sd)
-write.xlsx(tab_nutrient, file = "output/tab_nutrient.xlsx")
+tab_nutrient_output
+write.xlsx(tab_nutrient_output, file = "output/tab_nutrient.xlsx")
+
+# for prawn
+df <- tab_nutrient %>%
+  filter(species == "prawn")
+
+variables <- c("NH4", "NO2", "NO3", "PO4")
+map(variables, ~ {
+  normality_test_aov(df, .x, "name") %>%
+    filter(p_value > 0.05)
+})
+
+ks_test(df, "NH4", "name")
+ks_test(df, "NO2", "name")
+ks_test(df, "NO3", "name")
+ks_test(df, "PO4", "name")
+
+# for tilapia
+
+df <- tab_nutrient %>%
+  filter(species == "tilapia")
+
+variables <- c("NH4", "NO2", "NO3", "PO4")
+map(variables, ~ {
+  normality_test_aov(df, .x, "name") %>%
+    filter(p_value > 0.05)
+})
+
+ks_test(df, "NH4", "name")
+ks_test(df, "NO2", "name")
+ks_test(df, "NO3", "name")
+ks_test(df, "PO4", "name")
 
 # ghg ---------------------------------------------------------------------
 
-
-df_ghg |> 
-  distinct(species, sampling_date) |> 
+df_ghg |>
+  distinct(species, sampling_date) |>
   arrange(species, sampling_date)
 
-descriptive_statistic(filter(df_ghg, period == "CP"),
+df_ghg_cp_avg <- df_ghg %>%
+  filter(period == "CP") %>%
+  summarise(across(c(ghg_co2, ghg_ch4, ghg_ch4_mg, ghg_n2o),
+                    ~ mean(.x, na.rm = TRUE)),
+            .by = c(species, name, sampling_date))
+
+descriptive_statistic(df_ghg_cp_avg,
+                      groups = c(species),
+                      vars = c(ghg_co2, ghg_ch4_mg, ghg_n2o)) %>%
+  select(-contains("min")) %>%
+  as.data.frame()
+
+descriptive_statistic(df_ghg_cp_avg,
                       groups = c(species, name),
-                      vars = c(ghg_co2, ghg_ch4_mg, ghg_n2o)) %>% 
-  select(-contains("min")) %>% 
+                      vars = c(ghg_co2, ghg_ch4_mg, ghg_n2o)) %>%
+  select(-contains("min")) %>%
   as.data.frame()
 
 
 descriptive_statistic(filter(df_ghg, period == "CP"),
                       groups = c(species, sampling_month),
-                      vars = c(ghg_co2, ghg_ch4_mg, ghg_n2o)) %>% 
-  select(-contains("min")) %>% 
+                      vars = c(ghg_co2, ghg_ch4_mg, ghg_n2o)) %>%
+  select(-contains("min")) %>%
   as.data.frame()
 
-descriptive_statistic(filter(df_ghg_co2e, period == "CP"),
+df_ghg_co2e_cp_avg <- df_ghg_co2e %>%
+  filter(period == "CP") %>%
+  summarise(across(c(co2e_ghg, co2e_co2, co2e_ch4, co2e_n2o),
+                    ~ mean(.x, na.rm = TRUE)),
+            .by = c(species, name, sampling_date))
+
+descriptive_statistic(df_ghg_co2e_cp_avg,
                       groups = c(species, name),
-                      vars = c(co2e_ghg, co2e_co2, co2e_ch4, co2e_n2o)) %>% 
-  select(-contains("min")) %>% 
+                      vars = c(co2e_ghg, co2e_co2, co2e_ch4, co2e_n2o)) %>%
+  select(-contains("min")) %>%
   as.data.frame()
-wilcox.test(co2e_ghg ~ species, 
-            data = filter(df_ghg_co2e, period == "CP"))
+wilcox.test(co2e_ghg ~ species, data = df_ghg_co2e_cp_avg)
 
 
 df_ghg_co2e %>% 
@@ -532,13 +736,13 @@ descriptive_statistic(df,
 
 ## all-----
 
-df <- filter(df_ghg, species == "prawn", period == "CP")
+df <- filter(df_ghg_cp_avg, species == "prawn")
 
-ks_test(df, "ghg_co2", "name") 
-ks_test(df, "ghg_ch4", "name") 
-ks_test(df, "ghg_n2o", "name") 
+ks_test(df, "ghg_co2", "name")
+ks_test(df, "ghg_ch4", "name")
+ks_test(df, "ghg_n2o", "name")
 
-df <- filter(df_ghg, period == "CP")
+df <- df_ghg_cp_avg
 wilcox.test(ghg_ch4 ~ species, df)
 aggregate(ghg_ch4 ~ species, df, mean)
 wilcox.test(ghg_n2o ~ species, df)
@@ -546,86 +750,118 @@ aggregate(ghg_ch4 ~ species, df, mean)
 
 
 df_ghg_plot <- df_ghg %>%
-  filter(period == "CP") %>% 
-  mutate(new_species = factor(species, 
-                                   levels = c("prawn", "tilapia"), 
+  filter(period == "CP") %>%
+  mutate(new_species = factor(species,
+                                   levels = c("prawn", "tilapia"),
                                    labels = c("M. rosenbergii", "O. aureus × O. niloticus"))
   ) %>%
+  summarise(across(c(ghg_co2, ghg_ch4_mg, ghg_n2o), ~ mean(.x, na.rm = TRUE)),
+            .by = c(month, new_species, species, name, sampling_date)) %>%
   group_by(month, new_species, species, name) %>%
-  summarise(ghg_co2    = mean(ghg_co2,    na.rm = T),
+  summarise(sd_ghg_co2 = sd(ghg_co2, na.rm = T),
+            ghg_co2    = mean(ghg_co2,    na.rm = T),
             sd_ch4_mg  = sd(ghg_ch4_mg,   na.rm = T),
             ghg_ch4_mg = mean(ghg_ch4_mg, na.rm = T),
             sd_n2o     = sd(ghg_n2o,      na.rm = T),
             ghg_n2o    = mean(ghg_n2o,    na.rm = T),
   )
+descriptive_statistic(df_ghg_plot, vars = c(sd_ghg_co2, ghg_co2), groups = species) %>% as.data.frame()
 
 fig_ghg_prawn_a <- plot_ghg_all(df = filter(df_ghg_plot, species == 'prawn'),
+                                y = ghg_co2, ysd = sd_ghg_co2, plot = 'line') +
+  ylab(lab_co2) +
+  scale_color_manual(values = c("#ee9b00", "#ca6702", "#bb3e03")) +
+  scale_fill_manual(values = c("#ee9b00", "#ca6702", "#bb3e03")) +
+  ylim(-500, 500)
+fig_ghg_prawn_b <- plot_ghg_all(df = filter(df_ghg_plot, species == 'prawn'),
+                                y = ghg_co2, plot = 'box') +
+  ylab(NULL) +
+  scale_fill_manual(values = c("#ee9b00", "#ca6702", "#bb3e03")) +
+  ylim(-500, 500)
+fig_ghg_prawn_c <- plot_ghg_all(df = filter(df_ghg_plot, species == 'prawn'),
                                 y = ghg_ch4_mg, ysd = sd_ch4_mg, plot = 'line') +
   ylab(lab_ch4_mg) +
+  theme(strip.text.x = element_blank()) +
   scale_color_manual(values = c("#ee9b00", "#ca6702", "#bb3e03")) +
   scale_fill_manual(values = c("#ee9b00", "#ca6702", "#bb3e03")) +
   ylim(-1, 3)
-fig_ghg_prawn_b <- plot_ghg_all(df = filter(df_ghg_plot, species == 'prawn'),
-                                y = ghg_ch4_mg, plot = 'box') + 
+fig_ghg_prawn_d <- plot_ghg_all(df = filter(df_ghg_plot, species == 'prawn'),
+                                y = ghg_ch4_mg, plot = 'box') +
   ylab(NULL) +
+  theme(strip.text.x = element_blank()) +
   scale_fill_manual(values = c("#ee9b00", "#ca6702", "#bb3e03")) +
   ylim(-1, 3)
-fig_ghg_prawn_c <- plot_ghg_all(df = filter(df_ghg_plot, species == 'prawn'),
+fig_ghg_prawn_e <- plot_ghg_all(df = filter(df_ghg_plot, species == 'prawn'),
                                 y = ghg_n2o, ysd = sd_n2o, plot = 'line') +
   ylab(lab_n2o) +
   theme(strip.text.x = element_blank()) +
   scale_color_manual(values = c("#ee9b00", "#ca6702", "#bb3e03")) +
   scale_fill_manual(values = c("#ee9b00", "#ca6702", "#bb3e03")) +
   ylim(-300, 200)
-fig_ghg_prawn_d <- plot_ghg_all(df = filter(df_ghg_plot, species == 'prawn'),
-                                y = ghg_n2o, plot = 'box') + 
+fig_ghg_prawn_f <- plot_ghg_all(df = filter(df_ghg_plot, species == 'prawn'),
+                                y = ghg_n2o, plot = 'box') +
   ylab(NULL) +
   theme(strip.text.x = element_blank()) +
   scale_fill_manual(values = c("#ee9b00", "#ca6702", "#bb3e03")) +
   ylim(-300, 200)
 
 fig_ghg_tilapia_a <- plot_ghg_all(df = filter(df_ghg_plot, species == 'tilapia'),
+                                y = ghg_co2, ysd = sd_ghg_co2, plot = 'line') +
+  ylab(lab_co2) +
+  scale_color_manual(values = c("#94d2bd", "#0a9396", "#005f73")) +
+  scale_fill_manual(values = c("#94d2bd", "#0a9396", "#005f73")) +
+  ylim(-200, 750)
+fig_ghg_tilapia_b <- plot_ghg_all(df = filter(df_ghg_plot, species == 'tilapia'),
+                                y = ghg_co2, plot = 'box') +
+  ylab(NULL) +
+  scale_fill_manual(values = c("#94d2bd", "#0a9396", "#005f73")) +
+  ylim(-200, 750)
+fig_ghg_tilapia_c <- plot_ghg_all(df = filter(df_ghg_plot, species == 'tilapia'),
                                 y = ghg_ch4_mg, ysd = sd_ch4_mg, plot = 'line') +
   ylab(lab_ch4_mg) +
+  theme(strip.text.x = element_blank()) +
   scale_color_manual(values = c("#94d2bd", "#0a9396", "#005f73")) +
   scale_fill_manual(values = c("#94d2bd", "#0a9396", "#005f73")) +
   ylim(-10, 40)
-fig_ghg_tilapia_b <- plot_ghg_all(df = filter(df_ghg_plot, species == 'tilapia'),
-                                y = ghg_ch4_mg, plot = 'box') + 
+fig_ghg_tilapia_d <- plot_ghg_all(df = filter(df_ghg_plot, species == 'tilapia'),
+                                y = ghg_ch4_mg, plot = 'box') +
   ylab(NULL) +
+  theme(strip.text.x = element_blank()) +
   scale_fill_manual(values = c("#94d2bd", "#0a9396", "#005f73")) +
   ylim(-10, 40)
-fig_ghg_tilapia_c <- plot_ghg_all(df = filter(df_ghg_plot, species == 'tilapia'),
+fig_ghg_tilapia_e <- plot_ghg_all(df = filter(df_ghg_plot, species == 'tilapia'),
                                 y = ghg_n2o, ysd = sd_n2o, plot = 'line') +
   ylab(lab_n2o) +
   theme(strip.text.x = element_blank()) +
   scale_color_manual(values = c("#94d2bd", "#0a9396", "#005f73")) +
   scale_fill_manual(values = c("#94d2bd", "#0a9396", "#005f73")) +
-  ylim(-50, 500)
-fig_ghg_tilapia_d <- plot_ghg_all(df = filter(df_ghg_plot, species == 'tilapia'),
-                                y = ghg_n2o, plot = 'box') + 
+  ylim(-200, 600)
+fig_ghg_tilapia_f <- plot_ghg_all(df = filter(df_ghg_plot, species == 'tilapia'),
+                                y = ghg_n2o, plot = 'box') +
   ylab(NULL) +
   theme(strip.text.x = element_blank()) +
   scale_fill_manual(values = c("#94d2bd", "#0a9396", "#005f73")) +
-  ylim(-50, 500)
+  ylim(-200, 600)
 
-fig_ghg_prawn <- ggarrange(fig_ghg_prawn_a, fig_ghg_prawn_b, 
-          fig_ghg_prawn_c, fig_ghg_prawn_d, 
-          ncol = 2, nrow = 2,
+fig_ghg_prawn <- ggarrange(fig_ghg_prawn_a, fig_ghg_prawn_b,
+          fig_ghg_prawn_c, fig_ghg_prawn_d,
+          fig_ghg_prawn_e, fig_ghg_prawn_f,
+          ncol = 2, nrow = 3,
           widths = c(2, 1),
           font.label = list(size = 20, family = "Century Gothic"),
           common.legend = T, legend = "bottom")
-fig_ghg_tilapia <- ggarrange(fig_ghg_tilapia_a, fig_ghg_tilapia_b, 
-                           fig_ghg_tilapia_c, fig_ghg_tilapia_d, 
-                           ncol = 2, nrow = 2,
+fig_ghg_tilapia <- ggarrange(fig_ghg_tilapia_a, fig_ghg_tilapia_b,
+                           fig_ghg_tilapia_c, fig_ghg_tilapia_d,
+                           fig_ghg_tilapia_e, fig_ghg_tilapia_f,
+                           ncol = 2, nrow = 3,
                            widths = c(2, 1),
                            font.label = list(size = 20, family = "Century Gothic"),
                            common.legend = T, legend = "bottom")
 
-png(filename = "output/ghg_all.png", width = 22, height = 11, units = "in", res = 300)
-ggarrange(fig_ghg_prawn, fig_ghg_tilapia, 
+png(filename = "output/ghg_all.png", width = 22, height = 16.5, units = "in", res = 300)
+ggarrange(fig_ghg_prawn, fig_ghg_tilapia,
           ncol = 2, nrow = 1,
-          labels = c("(a)", "(b)"), 
+          labels = c("(a)", "(b)"),
           font.label = list(size = 20, family = "Century Gothic"),
           common.legend = T, legend = "bottom")
 dev.off()
@@ -662,35 +898,39 @@ tab_ghg_drainage
 
 ### test-----
 
-descriptive_statistic(df_ghg_drainage,
+df_ghg_drainage_avg <- df_ghg_drainage %>%
+  summarise(across(c(ghg_co2, ghg_ch4_mg, ghg_n2o), ~ mean(.x, na.rm = TRUE)),
+            .by = c(name, period, sampling_date))
+
+descriptive_statistic(df_ghg_drainage_avg,
                       vars = c(ghg_co2, ghg_ch4_mg, ghg_n2o),
                       groups = c(period)) |>
-  select(-contains("min")) |> 
+  select(-contains("min")) |>
   as.data.frame()
 
 # between period
 
-wilcox.test(ghg_co2 ~ period, 
-            data = df_ghg_drainage)
-aggregate(ghg_co2 ~ period, 
-          data = df_ghg_drainage,
+wilcox.test(ghg_co2 ~ period,
+            data = df_ghg_drainage_avg)
+aggregate(ghg_co2 ~ period,
+          data = df_ghg_drainage_avg,
           FUN = mean)
-wilcox.test(ghg_ch4_mg ~ period, 
-            data = df_ghg_drainage)
-aggregate(ghg_ch4_mg ~ period, 
-          data = df_ghg_drainage,
+wilcox.test(ghg_ch4_mg ~ period,
+            data = df_ghg_drainage_avg)
+aggregate(ghg_ch4_mg ~ period,
+          data = df_ghg_drainage_avg,
           FUN = mean)
-wilcox.test(ghg_n2o ~ period, 
-            data = df_ghg_drainage)
-aggregate(ghg_n2o ~ period, 
-          data = df_ghg_drainage,
+wilcox.test(ghg_n2o ~ period,
+            data = df_ghg_drainage_avg)
+aggregate(ghg_n2o ~ period,
+          data = df_ghg_drainage_avg,
           FUN = mean)
 
 # between light/dark
 
-df <- ghg %>% 
+df <- ghg %>%
   filter(water == 'fw', type == 'mono', name != 'prawn T1',
-         con %in% c('light', 'day', 'dark')) %>%
+         con %in% c('light', 'dark')) %>%
   mutate(ghg_ch4_mg = ghg_ch4 * µg_to_mg,
          name = dplyr::recode(name, 
                               'prawn T2' = 'PT1',
@@ -786,21 +1026,25 @@ period_ghg_fig_i <- plot_box(df_envr_soil, x = day_drainage, y = envr_silt, z = 
 
 ### plot----
 
+df_ghg_drainage_avg_date <- df_ghg_drainage %>%
+  summarise(across(c(ghg_co2, ghg_ch4_mg, ghg_n2o), ~ mean(.x, na.rm = TRUE)),
+            .by = c(name, period, sampling_date, day_drainage))
+df_ghg_drainage_avg_event <- df_ghg_drainage_avg_date %>%
+  mutate(drainage_event = case_when(
+    name == "PT2" & day_drainage %in% c("D4", "D25") ~ "PT2_Feb2025_event",
+    TRUE ~ paste(name, sampling_date)
+  )) %>%
+  summarise(across(c(ghg_co2, ghg_ch4_mg, ghg_n2o), ~ mean(.x, na.rm = TRUE)),
+            .by = c(period, drainage_event))
 
-period_ghg_fig_a <- plot_box(df_ghg_drainage, 
+period_ghg_fig_a <- plot_box(df_ghg_drainage_avg_event,
          x = period, y = ghg_co2, z = period) +
   xlab(NULL) +
   ylab(lab_co2) +
   see::scale_fill_okabeito() +
   ylim(-500, 1500) +
-  annotate("text",
-           x = c("DP", "CP"),
-           y = c(1400, 650),
-           label = c("a", "b"),
-           fontface = "bold", family = "Century Gothic",
-           size = 7) +
   theme(legend.position = "none")
-period_ghg_fig_b <- plot_box(df_ghg_drainage, 
+period_ghg_fig_b <- plot_box(df_ghg_drainage_avg_event,
          x = period, y = ghg_ch4_mg, z = period) +
   xlab(NULL) +
   ylab(lab_ch4_mg) +
@@ -813,18 +1057,12 @@ period_ghg_fig_b <- plot_box(df_ghg_drainage,
            fontface = "bold", family = "Century Gothic",
            size = 7) +
   theme(legend.position = "none")
-period_ghg_fig_c <- plot_box(df_ghg_drainage,
+period_ghg_fig_c <- plot_box(df_ghg_drainage_avg_event,
          x = period, y = ghg_n2o, z = period) +
   xlab(NULL) +
   ylab(lab_n2o) +
   see::scale_fill_okabeito() +
   coord_cartesian(ylim = c(-500, 15000)) +
-  annotate("text",
-           x = c("DP", "CP"),
-           y = c(14000, 1000),
-           label = c("a", "b"),
-           fontface = "bold", family = "Century Gothic",
-           size = 7) +
   theme(legend.position = "none")
 period_ghg_fig_d <- plot_box(filter(df_ghg_drainage, period == "DP"),
          x = day_drainage, y = ghg_co2, z = name) +
@@ -864,18 +1102,21 @@ dev.off()
 
 ## feed regression-----
 
-# For each row in pd_feed, calculate average ghg_n2o from df_ghg
+df_ghg_date_avg <- df_ghg %>%
+  summarise(across(c(ghg_co2, ghg_ch4, ghg_n2o), ~ mean(.x, na.rm = TRUE)),
+            .by = c(name, sampling_date))
+
 pd_feed <- pt_info %>%
   mutate(name = case_when(
     name == "PT2" ~ "PT1",
     name == "PT3" ~ "PT2",
     name == "PT4" ~ "PT3"
-  )) %>% 
+  )) %>%
   rowwise() %>%
   mutate(
     avg_ghg_co2 = {
       pond_name <- name
-      df_ghg %>%
+      df_ghg_date_avg %>%
         filter(
           name == pond_name,
           sampling_date >= stock_date,
@@ -886,7 +1127,7 @@ pd_feed <- pt_info %>%
     },
     avg_ghg_ch4 = {
       pond_name <- name
-      df_ghg %>%
+      df_ghg_date_avg %>%
         filter(
           name == pond_name,
           sampling_date >= stock_date,
@@ -897,7 +1138,7 @@ pd_feed <- pt_info %>%
     },
     avg_ghg_n2o = {
       pond_name <- name
-      df_ghg %>%
+      df_ghg_date_avg %>%
         filter(
           name == pond_name,
           sampling_date >= stock_date,
@@ -932,9 +1173,10 @@ dev.off()
 ## diurnal-----
 
 
-df_ghg_diurnal <- ghg %>% 
+df_ghg_diurnal <- ghg %>%
   filter(water == 'fw', type == 'mono', name != 'prawn T1') %>%
-  filter(year == '2025' & sampling %in% c('4th', '6th')) %>% 
+  filter(year == '2025' & sampling %in% c('4th', '6th')) %>%
+  filter(!(name == 'tilapia T1' & sampling == '6th')) %>%
   mutate(ghg_ch4_mg = ghg_ch4 * µg_to_mg,
          name = dplyr::recode(name, 
                               'prawn T2' = 'PT2',
@@ -958,10 +1200,11 @@ descriptive_statistic(df_ghg_diurnal,
                       groups = c(species, con)) %>% 
   select(-contains('min'))
 
-df_envr_diurnal <- envr %>% 
+df_envr_diurnal <- envr %>%
   filter(water == 'fw', type == 'mono', name != 'prawn T1') %>%
-  filter(year == '2025' & sampling %in% c('4th', '6th')) %>% 
-  mutate(name = dplyr::recode(name, 
+  filter(year == '2025' & sampling %in% c('4th', '6th')) %>%
+  filter(!(name == 'tilapia T1' & sampling == '6th')) %>%
+  mutate(name = dplyr::recode(name,
                               'prawn T2' = 'PT2',
                               'prawn T3' = 'PT3',
                               'prawn T4' = 'PT4',
@@ -987,7 +1230,15 @@ descriptive_statistic(df_envr_diurnal,
 
 ### test-----
 
-df <- df_ghg_diurnal %>% filter(species == "prawn")
+df_ghg_diurnal_avg <- df_ghg_diurnal %>%
+  summarise(across(c(ghg_co2, ghg_ch4, ghg_ch4_mg, ghg_n2o), ~ mean(.x, na.rm = TRUE)),
+            .by = c(species, new_species, name, con, sampling_date))
+df_envr_diurnal_avg <- df_envr_diurnal %>%
+  summarise(across(c(envr_temp, envr_ec, envr_do_pc, envr_do_w, envr_ph, envr_ntu),
+                    ~ mean(.x, na.rm = TRUE)),
+            .by = c(species, new_species, name, con, sampling_date))
+
+df <- df_ghg_diurnal_avg %>% filter(species == "prawn")
 wilcox.test(ghg_co2 ~ con, df)
 aggregate(ghg_co2 ~ con, df, FUN = mean)
 wilcox.test(ghg_ch4 ~ con, df)
@@ -995,7 +1246,7 @@ aggregate(ghg_ch4 ~ con, df, FUN = mean)
 wilcox.test(ghg_n2o ~ con, df)
 aggregate(ghg_n2o ~ con, df, FUN = mean)
 
-df <- df_ghg_diurnal %>% filter(species == "tilapia")
+df <- df_ghg_diurnal_avg %>% filter(species == "tilapia")
 wilcox.test(ghg_co2 ~ con, df)
 aggregate(ghg_co2 ~ con, df, FUN = mean)
 wilcox.test(ghg_ch4 ~ con, df)
@@ -1004,14 +1255,14 @@ wilcox.test(ghg_n2o ~ con, df)
 aggregate(ghg_n2o ~ con, df, FUN = mean)
 
 
-df <- filter(df_envr_diurnal, species == "prawn")
+df <- filter(df_envr_diurnal_avg, species == "prawn")
 wilcox.test(envr_temp ~ con, df)
 wilcox.test(envr_ec ~ con, df)
 wilcox.test(envr_do_pc ~ con, df)
 wilcox.test(envr_do_w ~ con, df)
 wilcox.test(envr_ph ~ con, df)
 wilcox.test(envr_ntu ~ con, df)
-df <- filter(df_envr_diurnal, species == "tilapia")
+df <- filter(df_envr_diurnal_avg, species == "tilapia")
 wilcox.test(envr_temp ~ con, df)
 wilcox.test(envr_ec ~ con, df)
 wilcox.test(envr_do_pc ~ con, df)
@@ -1023,66 +1274,54 @@ wilcox.test(envr_ntu ~ con, df)
 ### plot----
 
 ghg_diurnal_fig_a <-
-  ghg_diurnal_fig_a <-plot_box(df_ghg_diurnal, x = new_species, y = ghg_co2, z = con) +
+  plot_box(df_ghg_diurnal_avg, x = new_species, y = ghg_co2, z = con) +
   xlab(NULL) +
   ylab(lab_co2) +
   see::scale_fill_okabeito() +
   ylim(-200, 800) +
   annotate("text",
-           x = c(0.81, 1.19, 1.81, 2.19),
-           y = c(125, 175, 770, 300),
-           label = c("b", "a", "a", "b"),
+           x = c(1.81, 2.19),
+           y = c(550, 250),
+           label = c("a", "b"),
            fontface = "bold", family = "Century Gothic",
            size = 6) +
   theme(axis.text.x = element_text(face = "bold.italic"))
 ghg_diurnal_fig_b <-
-  plot_box(df_ghg_diurnal, x = new_species, y = ghg_ch4_mg, z = con) +
+  plot_box(df_ghg_diurnal_avg, x = new_species, y = ghg_ch4_mg, z = con) +
   xlab(NULL) +
   ylab(lab_ch4_mg) +
   see::scale_fill_okabeito() +
   ylim(-0.4, 40) +
-  annotate("text",
-           x = c(0.81, 1.19, 1.81, 2.19),
-           y = c(5, 5, 38, 5),
-           label = c("a", "b", "a", "b"),
-           fontface = "bold", family = "Century Gothic",
-           size = 6) +
   theme(axis.text.x = element_text(face = "bold.italic"))
-ghg_diurnal_fig_c <- 
-  plot_box(df_ghg_diurnal, x = new_species, y = ghg_n2o, z = con) +
+ghg_diurnal_fig_c <-
+  plot_box(df_ghg_diurnal_avg, x = new_species, y = ghg_n2o, z = con) +
   xlab(NULL) +
   ylab(lab_n2o) +
   see::scale_fill_okabeito() +
   theme(axis.text.x = element_text(face = "bold.italic")) +
   ylim(-100, 400)
-ghg_diurnal_fig_d <- 
-  plot_box(df_envr_diurnal, x = new_species, y = envr_temp, z = con) +
+ghg_diurnal_fig_d <-
+  plot_box(df_envr_diurnal_avg, x = new_species, y = envr_temp, z = con) +
   xlab(NULL) +
   ylab(lab_temp) +
   see::scale_fill_okabeito() +
   ylim(25, 40) +
   annotate("text",
-           x = c(0.81, 1.19, 1.81, 2.19),
-           y = c(37.5, 35, 35, 34),
-           label = c("a", "b", "a", "b"),
+           x = c(0.81, 1.19),
+           y = c(37.5, 35),
+           label = c("a", "b"),
            fontface = "bold", family = "Century Gothic",
            size = 6) +
-  theme(axis.text.x = element_text(face = "bold.italic")) 
+  theme(axis.text.x = element_text(face = "bold.italic"))
 ghg_diurnal_fig_e <-
-  plot_box(df_envr_diurnal, x = new_species, y = envr_do_w, z = con) +
+  plot_box(df_envr_diurnal_avg, x = new_species, y = envr_do_w, z = con) +
   xlab(NULL) +
   ylab(lab_do_w) +
   see::scale_fill_okabeito() +
   ylim(0, 20) +
-  annotate("text",
-           x = c(0.81, 1.19),
-           y = c(15, 12),
-           label = c("a", "b"),
-           fontface = "bold", family = "Century Gothic",
-           size = 6) +
-  theme(axis.text.x = element_text(face = "bold.italic")) 
-ghg_diurnal_fig_f <- 
-  plot_box(df_envr_diurnal, x = new_species, y = envr_ph, z = con) +
+  theme(axis.text.x = element_text(face = "bold.italic"))
+ghg_diurnal_fig_f <-
+  plot_box(df_envr_diurnal_avg, x = new_species, y = envr_ph, z = con) +
   xlab(NULL) +
   ylab(lab_ph) +
   see::scale_fill_okabeito() +
@@ -1181,9 +1420,6 @@ cmp_ch4 <- rbind(lit_ch4, this_ch4)
 
 letters_part <- toupper(letters[1:2])
 cmp_ch4$ID <- factor(cmp_ch4$ID, levels = c(letters_part, numbers_part))
-
-#tiff("compare_ch4.png", units="in", width = 5, height = 10, res=300)
-#dev.off()
 
 fig_cmp_ch4 <- ggplot(cmp_ch4, aes(x = ID)) +
   facet_wrap(system ~ new_species, scale = "free", 
@@ -1383,33 +1619,41 @@ df_do %>%
   filter(gpp <= 0 | rday <= 0) 
 
 df_do_filtered <- df_do %>%
-  filter(gpp > 0 & rday > 0) 
+  filter(gpp > 0 & rday > 0)
 
-descriptive_statistic(filter(df_do_filtered, period == "CP"),
+df_do_filtered_avg <- df_do_filtered %>%
+  summarise(across(c(gpp, rday), ~ mean(.x, na.rm = TRUE)),
+            .by = c(species, name, period, year_month, sampling_month, sampling_date))
+
+descriptive_statistic(filter(df_do_filtered_avg, period == "CP"),
                       vars = c(gpp, rday),
                       groups = c(species, name)) %>%
   select(-contains("min"))
 
-descriptive_statistic(filter(df_do_filtered, period == "CP"),
+descriptive_statistic(filter(df_do_filtered_avg, period == "CP"),
                       vars = c(gpp, rday),
                       groups = c(species, name, sampling_month)) %>%
-  select(-contains("min")) |> 
+  select(-contains("min")) |>
   as.data.frame()
 
-df_do_plot <- df_do_filtered %>%
+df_do_plot <- df_do_filtered_avg %>%
   filter(period == "CP") %>%
   mutate(new_species = factor(species,
                               levels = c("prawn", "tilapia"),
-                              labels = c("M. rosenbergii", "O. aureus × O. niloticus"))) %>% 
-  group_by(new_species, year_month, name) %>% 
+                              labels = c("M. rosenbergii", "O. aureus × O. niloticus"))) %>%
   summarise(gpp = mean(gpp),
-            rday = mean(rday)) %>% 
+            rday = mean(rday),
+            .by = c(new_species, year_month, name),
+            ) %>%
   mutate(pr_ratio = gpp/rday)
-
 
 descriptive_statistic(filter(df_do_plot),
                       vars = c(pr_ratio),
                       groups = c(new_species))
+
+descriptive_statistic(filter(df_do_plot),
+                      vars = c(pr_ratio),
+                      groups = c(new_species, name))
 
 fig_do_pr <- ggplot(df_do_plot, aes(x = new_species, y = pr_ratio)) +
   geom_jitter(aes(color = name), width = 0.2, size = 2, alpha = 0.6) +
@@ -1487,60 +1731,6 @@ ggarrange(fig_do_line, fig_do_pr,
           common.legend = F, legend = "bottom")
 dev.off()
 
-# budget -------------------------------------------------------------------------
-
-df_budget <- budget %>% 
-  filter(water == 'fw', type == 'mono', species == 'tilapia') %>% 
-  select(year, name, contains("cb"))
-
-df_budget <- df_budget %>% 
-  mutate(cb_output = cb_rday + cb_ghg_out + cb_sa + cb_outflow_all + cb_harvest,
-         cb_input = cb_gpp + cb_ghg_in + cb_feed + cb_inflow_all + cb_stock + cb_rain,
-         # Calculate contributions (%)
-         con_gpp = (cb_gpp / cb_input) * 100,
-         con_ghg_in = (cb_ghg_in / cb_input) * 100,
-         con_feed = (cb_feed / cb_input) * 100,
-         con_inflow = (cb_inflow_all / cb_input) * 100,
-         con_stock = (cb_stock / cb_input) * 100,
-         con_rain = (cb_rain / cb_input) * 100,
-         
-         con_rday = (cb_rday / cb_output) * 100,
-         con_ghg_out = (cb_ghg_out / cb_output) * 100,
-         con_sa = (cb_sa / cb_output) * 100,
-         con_outflow = (cb_outflow_all / cb_output) * 100,
-         con_harvest = (cb_harvest / cb_output) * 100
-  ) 
-
-df_budget |> 
-  select(name, contains("con_"))
-
-budget_out <- df_budget %>%
-  select(name, cb_rday, cb_ghg_out, cb_sa, 
-         cb_outflow_all, cb_harvest, cb_output)
-write.xlsx(budget_out, file = "output/tilapia_budget_out.xlsx")
-
-budget_in <- df_budget %>%
-  select(name, cb_gpp, cb_ghg_in, cb_feed, 
-         cb_inflow_all, cb_stock, cb_rain, cb_input) 
-write.xlsx(budget_in, file = "output/tilapia_budget_in.xlsx")
-
-pt_info <- pt_info %>% mutate(stock_total_kg = stock_ind * stock_ind_g * g_to_kg)
-descriptive_statistic(pt_info,
-                      groups = name,
-                      vars = c(area_m2, stock_density,
-                               stock_total_kg, harvest_total_kg,
-                               input_rate, culture_day)) %>% 
-  select(-contains("min")) %>% 
-  as.data.frame()
-
-info %>% 
-  filter(species == "tilapia") %>% 
-  select(site, area_m2, stock_density,
-         stock_animals_total_kg, harvest_animals_total_kg,
-         feed_input_rate, day_culture) %>% 
-  as.data.frame()
-
-
 # cor ---------------------------------------------------------------------
 
 df_cor <- raw_budget %>%
@@ -1571,51 +1761,9 @@ corrplot.mixed(results_cor$r,
 dev.off()
 
 # pls-sem -----------------------------------------------------------------
-# Model specification history:
-#   v1 (original)  — all constructs mode_B
-#   v2             — OM mode_B; envr_temp, pon, envr_chla, envr_nh4, envr_no2 removed
-#   v3             — OM switched to reflective (mode_A): poc, pon, NTU, SS
-#                    REDOX: envr_temp removed; NUTRIENT: envr_nh4, envr_no2 removed
-#   v4             — SA (sediment carbon accumulation, c_sa) added
-#   v5             — TEMP (envr_temp) added as standalone single-item exogenous
-#                    construct with direct paths to CO2, CH4, N2O.
-#                    Tested as formative indicator within REDOX (Options 1a/1b) —
-#                    both reduced R²; collinearity with pH and DIC confirmed.
-#                    Standalone specification produced significant TEMP -> CH4
-#                    (T=2.15) and TEMP -> N2O (T=2.04) paths, improving R² for
-#                    CH4 (+0.026) and N2O (+0.033) vs v4. VIF(TEMP) = 1.49.
-#                    Weather variables (wx_temp, wx_wind, wx_pressure, wx_humidity)
-#                    tested in mode_B 4-item, mode_A pressure+wind, single-item
-#                    wx_wind, and reflective envr_temp+wx_temp specifications;
-#                    all structural paths non-significant, all GHG R² declined.
-#                    Structural alternatives M2 (CO2→CH4/N2O), M3 (OM→SA), M4
-#                    (M2+M3) tested via BIC and bootstrapped paths: M2 produces
-#                    β>1.0 on CO2→N2O, suppresses 6/8 significant paths, 40 boot
-#                    non-convergences, and 5 MGA non-invariant paths. M3 loses
-#                    SA→CO2 and SA→N2O significance; 5 MGA non-invariant paths.
-#                    BIC favours M1/M2 over M3/M4 for OM and CO2 equations.
-#                    v5 (M1) retained: 8 significant paths, full MGA invariance,
-#                    no bootstrap instability.
-#   v6 (final)     — Two structural paths added from exploratory tests:
-#                    (1) TEMP -> REDOX: temperature regulates water-column redox
-#                    chemistry (DO, pH, DIC). T=3.45, β=0.39, f²=0.183 (medium).
-#                    TEMP -> REDOX/NUTRIENT/OM all tested; TEMP -> OM non-sig
-#                    (T=0.55); TEMP -> NUTRIENT borderline (T=2.04, CI clips 0).
-#                    (2) OM -> SA: particulate organic matter drives sediment
-#                    carbon accumulation. T=3.14, β=0.39, f²=0.174 (medium).
-#                    REDOX -> SA and NUTRIENT -> SA also tested; NUTRIENT non-sig
-#                    (T=0.66); REDOX borderline (T=1.84, CI clips 0).
-#                    DOC tested as standalone construct -> GHG (Option A): all
-#                    three DOC paths non-sig (max T=1.10); dropped.
-#                    v6 adds REDOX and SA as endogenous variables; GHG R²
-#                    unchanged; full MGA invariance; VIF < 5.0 throughout.
-#                    New HTMT note: TEMP-NUTRIENT 90% CI upper = 0.907 (marginal
-#                    violation, structural artifact of TEMP -> REDOX -> NUTRIENT
-#                    chain; acknowledged limitation alongside REDOX-NUTRIENT
-#                    HTMT = 1.059).
 
 df_sem <- raw_budget %>%
-  filter(water == "fw", type == "mono") %>%
+  filter(water == "fw", type == "mono", name != "prawn T1") %>%
   dplyr::select(year, sampling_date, name, species, sampling,
                 envr_ph, envr_ec,
                 envr_do_w, envr_do_pc,
@@ -1633,17 +1781,11 @@ cat("n total =", nrow(df_sem), "\n")
 cat("Species breakdown:\n")
 print(table(df_sem$species))
 
-beta_min      <- 0.38
-n_min         <- ceiling((2.486 / beta_min)^2)
 max_arrows_in <- 5  # CO2/CH4/N2O receive 5 paths: REDOX, OM, NUTRIENT, SA, TEMP
                     # (unchanged from v5; TEMP->REDOX and OM->SA do not add arrows into GHG)
 cat("\n10x rule minimum n:", max_arrows_in * 10,
     "| Your n =", nrow(df_sem),
     "->", ifelse(nrow(df_sem) >= max_arrows_in * 10, "[OK]", "[WARNING]"), "\n")
-cat("beta_min minimum n:", n_min,
-    "| Your n =", nrow(df_sem),
-    "->", ifelse(nrow(df_sem) >= n_min, "[OK]", "[WARNING]"), "\n")
-
 
 ## Model specification -----------------------------------------------------
 
@@ -1725,7 +1867,7 @@ cat("\n=== [OM — REFLECTIVE] HTMT discriminant validity (alpha = 0.10) ===\n")
 cat("Threshold: HTMT < 0.85; 90% CI upper < 0.90\n")
 htmt <- boot_sum10$bootstrapped_HTMT
 print(round(htmt, 3))
-cat("Note: REDOX-NUTRIENT HTMT > 1.0 and TEMP-NUTRIENT CI upper = 0.907 are known limitations (see spec comment).\n")
+cat("Note: REDOX-NUTRIENT HTMT > 1.0 and TEMP-NUTRIENT CI upper = 0.907 are known limitations (see model spec comment above).\n")
 
 write.xlsx(as.data.frame(model_summary$reliability), file = "output/reliability.xlsx")
 write.xlsx(as.data.frame(htmt),                      file = "output/htmt.xlsx")
