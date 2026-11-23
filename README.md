@@ -2,10 +2,9 @@
 
 [![DOI](https://zenodo.org/badge/1204679331.svg)](https://doi.org/10.5281/zenodo.19467725)
 
-Data and R scripts supporting the manuscript:
+Data and R scripts supporting the article:
 
-> Title: **Species-specific greenhouse gas emissions and carbon budgets in freshwater monoculture ponds**  
-> Authors: Zhao-Jun Yong, Wei‐Jen Lin, Yao-Chen Lee, Yan-Cheng Liang, Shuenn-Der Yang, Hsing-Juh Lin  
+> Yong, Z.-J., Lin, W.-J., Lee, Y.-C., Liang, Y.-C., Yang, S.-D., Lin, H.-J. (2026). Species-specific greenhouse gas emissions and carbon budgets in freshwater monoculture ponds. *Aquaculture International*, 34, 258. https://doi.org/10.1007/s10499-026-02664-2
 
 ---
 
@@ -69,4 +68,4 @@ All `data/*.rds` files contain data filtered to freshwater monoculture systems (
 
 ## Citation
 
-If you use this repository, please cite the associated manuscript (not yet published) and this dataset.
+If you use this repository, please cite the article above (https://doi.org/10.1007/s10499-026-02664-2) and this dataset (https://doi.org/10.5281/zenodo.19467725).
